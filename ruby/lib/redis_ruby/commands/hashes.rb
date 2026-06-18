@@ -210,22 +210,22 @@ module RedisRuby
 
       sig { params(table: CommandTable).void }
       def self.install(table)
-        table.add("hset", -4, %i[write fast]) { |c, a| hset(c, a) }
-        table.add("hmset", -4, %i[write fast]) { |c, a| hmset(c, a) }
-        table.add("hsetnx", 4, %i[write fast]) { |c, a| hsetnx(c, a) }
-        table.add("hget", 3, %i[readonly fast]) { |c, a| hget(c, a) }
-        table.add("hmget", -3, %i[readonly fast]) { |c, a| hmget(c, a) }
-        table.add("hdel", -3, %i[write fast]) { |c, a| hdel(c, a) }
-        table.add("hlen", 2, %i[readonly fast]) { |c, a| hlen(c, a) }
-        table.add("hexists", 3, %i[readonly fast]) { |c, a| hexists(c, a) }
-        table.add("hstrlen", 3, %i[readonly fast]) { |c, a| hstrlen(c, a) }
-        table.add("hkeys", 2, %i[readonly]) { |c, a| hkeys(c, a) }
-        table.add("hvals", 2, %i[readonly]) { |c, a| hvals(c, a) }
-        table.add("hgetall", 2, %i[readonly]) { |c, a| hgetall(c, a) }
-        table.add("hincrby", 4, %i[write fast]) { |c, a| hincrby(c, a) }
-        table.add("hincrbyfloat", 4, %i[write fast]) { |c, a| hincrbyfloat(c, a) }
-        table.add("hrandfield", -2, %i[readonly]) { |c, a| hrandfield(c, a) }
-        table.add("hscan", -3, %i[readonly]) { |c, a| hscan(c, a) }
+        table.add("hset", -4, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| hset(c, a) }
+        table.add("hmset", -4, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| hmset(c, a) }
+        table.add("hsetnx", 4, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| hsetnx(c, a) }
+        table.add("hget", 3, [CommandFlag::Readonly, CommandFlag::Fast]) { |c, a| hget(c, a) }
+        table.add("hmget", -3, [CommandFlag::Readonly, CommandFlag::Fast]) { |c, a| hmget(c, a) }
+        table.add("hdel", -3, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| hdel(c, a) }
+        table.add("hlen", 2, [CommandFlag::Readonly, CommandFlag::Fast]) { |c, a| hlen(c, a) }
+        table.add("hexists", 3, [CommandFlag::Readonly, CommandFlag::Fast]) { |c, a| hexists(c, a) }
+        table.add("hstrlen", 3, [CommandFlag::Readonly, CommandFlag::Fast]) { |c, a| hstrlen(c, a) }
+        table.add("hkeys", 2, [CommandFlag::Readonly]) { |c, a| hkeys(c, a) }
+        table.add("hvals", 2, [CommandFlag::Readonly]) { |c, a| hvals(c, a) }
+        table.add("hgetall", 2, [CommandFlag::Readonly]) { |c, a| hgetall(c, a) }
+        table.add("hincrby", 4, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| hincrby(c, a) }
+        table.add("hincrbyfloat", 4, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| hincrbyfloat(c, a) }
+        table.add("hrandfield", -2, [CommandFlag::Readonly]) { |c, a| hrandfield(c, a) }
+        table.add("hscan", -3, [CommandFlag::Readonly]) { |c, a| hscan(c, a) }
       end
     end
   end

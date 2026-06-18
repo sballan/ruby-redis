@@ -123,15 +123,15 @@ module RedisRuby
 
       sig { params(table: CommandTable).void }
       def self.install(table)
-        table.add("subscribe", -2, %i[pubsub fast loading]) { |c, a| subscribe(c, a) }
-        table.add("unsubscribe", -1, %i[pubsub fast loading]) { |c, a| unsubscribe(c, a) }
-        table.add("psubscribe", -2, %i[pubsub fast loading]) { |c, a| psubscribe(c, a) }
-        table.add("punsubscribe", -1, %i[pubsub fast loading]) { |c, a| punsubscribe(c, a) }
-        table.add("ssubscribe", -2, %i[pubsub fast loading]) { |c, a| ssubscribe(c, a) }
-        table.add("sunsubscribe", -1, %i[pubsub fast loading]) { |c, a| sunsubscribe(c, a) }
-        table.add("publish", 3, %i[pubsub fast loading]) { |c, a| publish(c, a) }
-        table.add("spublish", 3, %i[pubsub fast loading]) { |c, a| spublish(c, a) }
-        table.add("pubsub", -2, %i[pubsub loading]) { |c, a| pubsub(c, a) }
+        table.add("subscribe", -2, [CommandFlag::Pubsub, CommandFlag::Fast, CommandFlag::Loading]) { |c, a| subscribe(c, a) }
+        table.add("unsubscribe", -1, [CommandFlag::Pubsub, CommandFlag::Fast, CommandFlag::Loading]) { |c, a| unsubscribe(c, a) }
+        table.add("psubscribe", -2, [CommandFlag::Pubsub, CommandFlag::Fast, CommandFlag::Loading]) { |c, a| psubscribe(c, a) }
+        table.add("punsubscribe", -1, [CommandFlag::Pubsub, CommandFlag::Fast, CommandFlag::Loading]) { |c, a| punsubscribe(c, a) }
+        table.add("ssubscribe", -2, [CommandFlag::Pubsub, CommandFlag::Fast, CommandFlag::Loading]) { |c, a| ssubscribe(c, a) }
+        table.add("sunsubscribe", -1, [CommandFlag::Pubsub, CommandFlag::Fast, CommandFlag::Loading]) { |c, a| sunsubscribe(c, a) }
+        table.add("publish", 3, [CommandFlag::Pubsub, CommandFlag::Fast, CommandFlag::Loading]) { |c, a| publish(c, a) }
+        table.add("spublish", 3, [CommandFlag::Pubsub, CommandFlag::Fast, CommandFlag::Loading]) { |c, a| spublish(c, a) }
+        table.add("pubsub", -2, [CommandFlag::Pubsub, CommandFlag::Loading]) { |c, a| pubsub(c, a) }
       end
     end
   end

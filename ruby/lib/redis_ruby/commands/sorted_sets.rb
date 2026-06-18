@@ -706,38 +706,38 @@ module RedisRuby
 
       sig { params(table: CommandTable).void }
       def self.install(table)
-        table.add("zadd", -4, %i[write fast]) { |c, a| zadd(c, a) }
-        table.add("zincrby", 4, %i[write fast]) { |c, a| zincrby(c, a) }
-        table.add("zscore", 3, %i[readonly fast]) { |c, a| zscore(c, a) }
-        table.add("zmscore", -3, %i[readonly fast]) { |c, a| zmscore(c, a) }
-        table.add("zcard", 2, %i[readonly fast]) { |c, a| zcard(c, a) }
-        table.add("zrem", -3, %i[write fast]) { |c, a| zrem(c, a) }
-        table.add("zrank", -3, %i[readonly fast]) { |c, a| zrank(c, a) }
-        table.add("zrevrank", -3, %i[readonly fast]) { |c, a| zrevrank(c, a) }
-        table.add("zcount", 4, %i[readonly fast]) { |c, a| zcount(c, a) }
-        table.add("zlexcount", 4, %i[readonly fast]) { |c, a| zlexcount(c, a) }
-        table.add("zrange", -4, %i[readonly]) { |c, a| zrange(c, a) }
-        table.add("zrevrange", -4, %i[readonly]) { |c, a| zrevrange(c, a) }
-        table.add("zrangebyscore", -4, %i[readonly]) { |c, a| zrangebyscore(c, a) }
-        table.add("zrevrangebyscore", -4, %i[readonly]) { |c, a| zrevrangebyscore(c, a) }
-        table.add("zrangebylex", -4, %i[readonly]) { |c, a| zrangebylex(c, a) }
-        table.add("zrevrangebylex", -4, %i[readonly]) { |c, a| zrevrangebylex(c, a) }
-        table.add("zrangestore", -5, %i[write]) { |c, a| zrangestore(c, a) }
-        table.add("zpopmin", -2, %i[write fast]) { |c, a| zpopmin(c, a) }
-        table.add("zpopmax", -2, %i[write fast]) { |c, a| zpopmax(c, a) }
-        table.add("zmpop", -4, %i[write]) { |c, a| zmpop(c, a) }
-        table.add("zrandmember", -2, %i[readonly]) { |c, a| zrandmember(c, a) }
-        table.add("zremrangebyrank", 4, %i[write]) { |c, a| zremrangebyrank(c, a) }
-        table.add("zremrangebyscore", 4, %i[write]) { |c, a| zremrangebyscore(c, a) }
-        table.add("zremrangebylex", 4, %i[write]) { |c, a| zremrangebylex(c, a) }
-        table.add("zunionstore", -4, %i[write]) { |c, a| zunionstore(c, a) }
-        table.add("zinterstore", -4, %i[write]) { |c, a| zinterstore(c, a) }
-        table.add("zdiffstore", -4, %i[write]) { |c, a| zdiffstore(c, a) }
-        table.add("zunion", -3, %i[readonly]) { |c, a| zunion(c, a) }
-        table.add("zinter", -3, %i[readonly]) { |c, a| zinter(c, a) }
-        table.add("zdiff", -3, %i[readonly]) { |c, a| zdiff(c, a) }
-        table.add("zintercard", -3, %i[readonly]) { |c, a| zintercard(c, a) }
-        table.add("zscan", -3, %i[readonly]) { |c, a| zscan(c, a) }
+        table.add("zadd", -4, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| zadd(c, a) }
+        table.add("zincrby", 4, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| zincrby(c, a) }
+        table.add("zscore", 3, [CommandFlag::Readonly, CommandFlag::Fast]) { |c, a| zscore(c, a) }
+        table.add("zmscore", -3, [CommandFlag::Readonly, CommandFlag::Fast]) { |c, a| zmscore(c, a) }
+        table.add("zcard", 2, [CommandFlag::Readonly, CommandFlag::Fast]) { |c, a| zcard(c, a) }
+        table.add("zrem", -3, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| zrem(c, a) }
+        table.add("zrank", -3, [CommandFlag::Readonly, CommandFlag::Fast]) { |c, a| zrank(c, a) }
+        table.add("zrevrank", -3, [CommandFlag::Readonly, CommandFlag::Fast]) { |c, a| zrevrank(c, a) }
+        table.add("zcount", 4, [CommandFlag::Readonly, CommandFlag::Fast]) { |c, a| zcount(c, a) }
+        table.add("zlexcount", 4, [CommandFlag::Readonly, CommandFlag::Fast]) { |c, a| zlexcount(c, a) }
+        table.add("zrange", -4, [CommandFlag::Readonly]) { |c, a| zrange(c, a) }
+        table.add("zrevrange", -4, [CommandFlag::Readonly]) { |c, a| zrevrange(c, a) }
+        table.add("zrangebyscore", -4, [CommandFlag::Readonly]) { |c, a| zrangebyscore(c, a) }
+        table.add("zrevrangebyscore", -4, [CommandFlag::Readonly]) { |c, a| zrevrangebyscore(c, a) }
+        table.add("zrangebylex", -4, [CommandFlag::Readonly]) { |c, a| zrangebylex(c, a) }
+        table.add("zrevrangebylex", -4, [CommandFlag::Readonly]) { |c, a| zrevrangebylex(c, a) }
+        table.add("zrangestore", -5, [CommandFlag::Write]) { |c, a| zrangestore(c, a) }
+        table.add("zpopmin", -2, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| zpopmin(c, a) }
+        table.add("zpopmax", -2, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| zpopmax(c, a) }
+        table.add("zmpop", -4, [CommandFlag::Write]) { |c, a| zmpop(c, a) }
+        table.add("zrandmember", -2, [CommandFlag::Readonly]) { |c, a| zrandmember(c, a) }
+        table.add("zremrangebyrank", 4, [CommandFlag::Write]) { |c, a| zremrangebyrank(c, a) }
+        table.add("zremrangebyscore", 4, [CommandFlag::Write]) { |c, a| zremrangebyscore(c, a) }
+        table.add("zremrangebylex", 4, [CommandFlag::Write]) { |c, a| zremrangebylex(c, a) }
+        table.add("zunionstore", -4, [CommandFlag::Write]) { |c, a| zunionstore(c, a) }
+        table.add("zinterstore", -4, [CommandFlag::Write]) { |c, a| zinterstore(c, a) }
+        table.add("zdiffstore", -4, [CommandFlag::Write]) { |c, a| zdiffstore(c, a) }
+        table.add("zunion", -3, [CommandFlag::Readonly]) { |c, a| zunion(c, a) }
+        table.add("zinter", -3, [CommandFlag::Readonly]) { |c, a| zinter(c, a) }
+        table.add("zdiff", -3, [CommandFlag::Readonly]) { |c, a| zdiff(c, a) }
+        table.add("zintercard", -3, [CommandFlag::Readonly]) { |c, a| zintercard(c, a) }
+        table.add("zscan", -3, [CommandFlag::Readonly]) { |c, a| zscan(c, a) }
       end
     end
   end

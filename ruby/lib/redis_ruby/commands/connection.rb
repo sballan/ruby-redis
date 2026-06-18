@@ -170,13 +170,13 @@ module RedisRuby
       def self.client_reply(client, mode)
         case mode.downcase
         when "on"
-          client.reply_mode = :on
+          client.reply_mode = ReplyMode::On
           Reply::OK
         when "off"
-          client.reply_mode = :off
+          client.reply_mode = ReplyMode::Off
           Reply::NO_REPLY
         when "skip"
-          client.request_skip_reply if client.reply_mode == :on
+          client.request_skip_reply if client.reply_mode == ReplyMode::On
           Reply::NO_REPLY
         else
           raise CommandError.syntax
@@ -209,7 +209,7 @@ module RedisRuby
         [
           command.name.downcase,
           command.arity,
-          command.flags.map { |flag| Reply::SimpleString.new(flag.to_s.tr("_", "")) },
+          command.flags.map { |flag| Reply::SimpleString.new(flag.serialize.tr("_", "")) },
           has_key ? 1 : 0,
           has_key ? 1 : 0,
           has_key ? 1 : 0,
@@ -222,16 +222,16 @@ module RedisRuby
 
       sig { params(table: CommandTable).void }
       def self.install(table)
-        table.add("ping", -1, %i[fast]) { |c, a| ping(c, a) }
-        table.add("echo", 2, %i[fast]) { |c, a| echo(c, a) }
-        table.add("select", 2, %i[fast loading]) { |c, a| select(c, a) }
-        table.add("swapdb", 3, %i[write fast]) { |c, a| swapdb(c, a) }
-        table.add("auth", -2, %i[fast loading no_multi]) { |c, a| auth(c, a) }
-        table.add("hello", -1, %i[fast loading no_multi]) { |c, a| hello(c, a) }
-        table.add("quit", -1, %i[fast loading pubsub]) { |c, a| quit(c, a) }
-        table.add("reset", 1, %i[fast loading pubsub no_multi]) { |c, a| reset(c, a) }
-        table.add("client", -2, %i[admin]) { |c, a| client(c, a) }
-        table.add("command", -1, %i[loading]) { |c, a| command(c, a) }
+        table.add("ping", -1, [CommandFlag::Fast]) { |c, a| ping(c, a) }
+        table.add("echo", 2, [CommandFlag::Fast]) { |c, a| echo(c, a) }
+        table.add("select", 2, [CommandFlag::Fast, CommandFlag::Loading]) { |c, a| select(c, a) }
+        table.add("swapdb", 3, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| swapdb(c, a) }
+        table.add("auth", -2, [CommandFlag::Fast, CommandFlag::Loading, CommandFlag::NoMulti]) { |c, a| auth(c, a) }
+        table.add("hello", -1, [CommandFlag::Fast, CommandFlag::Loading, CommandFlag::NoMulti]) { |c, a| hello(c, a) }
+        table.add("quit", -1, [CommandFlag::Fast, CommandFlag::Loading, CommandFlag::Pubsub]) { |c, a| quit(c, a) }
+        table.add("reset", 1, [CommandFlag::Fast, CommandFlag::Loading, CommandFlag::Pubsub, CommandFlag::NoMulti]) { |c, a| reset(c, a) }
+        table.add("client", -2, [CommandFlag::Admin]) { |c, a| client(c, a) }
+        table.add("command", -1, [CommandFlag::Loading]) { |c, a| command(c, a) }
       end
     end
   end

@@ -169,11 +169,11 @@ module RedisRuby
 
       sig { params(table: CommandTable).void }
       def self.install(table)
-        table.add("setbit", 4, %i[write]) { |c, a| setbit(c, a) }
-        table.add("getbit", 3, %i[readonly fast]) { |c, a| getbit(c, a) }
-        table.add("bitcount", -2, %i[readonly]) { |c, a| bitcount(c, a) }
-        table.add("bitpos", -3, %i[readonly]) { |c, a| bitpos(c, a) }
-        table.add("bitop", -4, %i[write]) { |c, a| bitop(c, a) }
+        table.add("setbit", 4, [CommandFlag::Write]) { |c, a| setbit(c, a) }
+        table.add("getbit", 3, [CommandFlag::Readonly, CommandFlag::Fast]) { |c, a| getbit(c, a) }
+        table.add("bitcount", -2, [CommandFlag::Readonly]) { |c, a| bitcount(c, a) }
+        table.add("bitpos", -3, [CommandFlag::Readonly]) { |c, a| bitpos(c, a) }
+        table.add("bitop", -4, [CommandFlag::Write]) { |c, a| bitop(c, a) }
       end
     end
   end

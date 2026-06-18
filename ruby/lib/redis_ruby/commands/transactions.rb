@@ -64,11 +64,11 @@ module RedisRuby
 
       sig { params(table: CommandTable).void }
       def self.install(table)
-        table.add("multi", 1, %i[fast loading no_multi]) { |c, a| multi(c, a) }
-        table.add("discard", 1, %i[fast loading no_multi]) { |c, a| discard(c, a) }
-        table.add("exec", 1, %i[loading no_multi]) { |c, a| exec(c, a) }
-        table.add("watch", -2, %i[fast loading no_multi]) { |c, a| watch(c, a) }
-        table.add("unwatch", 1, %i[fast loading no_multi]) { |c, a| unwatch(c, a) }
+        table.add("multi", 1, [CommandFlag::Fast, CommandFlag::Loading, CommandFlag::NoMulti]) { |c, a| multi(c, a) }
+        table.add("discard", 1, [CommandFlag::Fast, CommandFlag::Loading, CommandFlag::NoMulti]) { |c, a| discard(c, a) }
+        table.add("exec", 1, [CommandFlag::Loading, CommandFlag::NoMulti]) { |c, a| exec(c, a) }
+        table.add("watch", -2, [CommandFlag::Fast, CommandFlag::Loading, CommandFlag::NoMulti]) { |c, a| watch(c, a) }
+        table.add("unwatch", 1, [CommandFlag::Fast, CommandFlag::Loading, CommandFlag::NoMulti]) { |c, a| unwatch(c, a) }
       end
     end
   end

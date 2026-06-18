@@ -225,23 +225,23 @@ module RedisRuby
 
       sig { params(table: CommandTable).void }
       def self.install(table)
-        table.add("sadd", -3, %i[write fast]) { |c, a| sadd(c, a) }
-        table.add("srem", -3, %i[write fast]) { |c, a| srem(c, a) }
-        table.add("smembers", 2, %i[readonly]) { |c, a| smembers(c, a) }
-        table.add("sismember", 3, %i[readonly fast]) { |c, a| sismember(c, a) }
-        table.add("smismember", -3, %i[readonly fast]) { |c, a| smismember(c, a) }
-        table.add("scard", 2, %i[readonly fast]) { |c, a| scard(c, a) }
-        table.add("spop", -2, %i[write fast]) { |c, a| spop(c, a) }
-        table.add("srandmember", -2, %i[readonly]) { |c, a| srandmember(c, a) }
-        table.add("smove", 4, %i[write fast]) { |c, a| smove(c, a) }
-        table.add("sinter", -2, %i[readonly]) { |c, a| sinter(c, a) }
-        table.add("sunion", -2, %i[readonly]) { |c, a| sunion(c, a) }
-        table.add("sdiff", -2, %i[readonly]) { |c, a| sdiff(c, a) }
-        table.add("sinterstore", -3, %i[write]) { |c, a| sinterstore(c, a) }
-        table.add("sunionstore", -3, %i[write]) { |c, a| sunionstore(c, a) }
-        table.add("sdiffstore", -3, %i[write]) { |c, a| sdiffstore(c, a) }
-        table.add("sintercard", -3, %i[readonly]) { |c, a| sintercard(c, a) }
-        table.add("sscan", -3, %i[readonly]) { |c, a| sscan(c, a) }
+        table.add("sadd", -3, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| sadd(c, a) }
+        table.add("srem", -3, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| srem(c, a) }
+        table.add("smembers", 2, [CommandFlag::Readonly]) { |c, a| smembers(c, a) }
+        table.add("sismember", 3, [CommandFlag::Readonly, CommandFlag::Fast]) { |c, a| sismember(c, a) }
+        table.add("smismember", -3, [CommandFlag::Readonly, CommandFlag::Fast]) { |c, a| smismember(c, a) }
+        table.add("scard", 2, [CommandFlag::Readonly, CommandFlag::Fast]) { |c, a| scard(c, a) }
+        table.add("spop", -2, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| spop(c, a) }
+        table.add("srandmember", -2, [CommandFlag::Readonly]) { |c, a| srandmember(c, a) }
+        table.add("smove", 4, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| smove(c, a) }
+        table.add("sinter", -2, [CommandFlag::Readonly]) { |c, a| sinter(c, a) }
+        table.add("sunion", -2, [CommandFlag::Readonly]) { |c, a| sunion(c, a) }
+        table.add("sdiff", -2, [CommandFlag::Readonly]) { |c, a| sdiff(c, a) }
+        table.add("sinterstore", -3, [CommandFlag::Write]) { |c, a| sinterstore(c, a) }
+        table.add("sunionstore", -3, [CommandFlag::Write]) { |c, a| sunionstore(c, a) }
+        table.add("sdiffstore", -3, [CommandFlag::Write]) { |c, a| sdiffstore(c, a) }
+        table.add("sintercard", -3, [CommandFlag::Readonly]) { |c, a| sintercard(c, a) }
+        table.add("sscan", -3, [CommandFlag::Readonly]) { |c, a| sscan(c, a) }
       end
     end
   end
