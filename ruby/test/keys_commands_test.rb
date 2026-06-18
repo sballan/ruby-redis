@@ -77,12 +77,42 @@ class KeysCommandsTest < ServerTest
     assert_equal 20, seen.uniq.size
   end
 
-  def test_object_encoding
+  def test_object_encoding_strings
     r("SET", "n", "12345")
     assert_equal "int", r("OBJECT", "ENCODING", "n")
     r("SET", "s", "hello")
     assert_equal "embstr", r("OBJECT", "ENCODING", "s")
+    r("SET", "big", "x" * 64)
+    assert_equal "raw", r("OBJECT", "ENCODING", "big")
+  end
+
+  def test_object_encoding_list_transition
     r("RPUSH", "l", "x")
+    assert_equal "listpack", r("OBJECT", "ENCODING", "l")
+    r("RPUSH", "l", "y" * 65) # element over 64 bytes forces quicklist
     assert_equal "quicklist", r("OBJECT", "ENCODING", "l")
+  end
+
+  def test_object_encoding_set_transition
+    r("SADD", "ints", "1", "2", "3")
+    assert_equal "intset", r("OBJECT", "ENCODING", "ints")
+    r("SADD", "ints", "hello") # a non-integer member drops intset
+    assert_equal "listpack", r("OBJECT", "ENCODING", "ints")
+    130.times { |i| r("SADD", "big", "m#{i}") }
+    assert_equal "hashtable", r("OBJECT", "ENCODING", "big")
+  end
+
+  def test_object_encoding_hash_transition
+    r("HSET", "h", "f", "v")
+    assert_equal "listpack", r("OBJECT", "ENCODING", "h")
+    r("HSET", "h", "f2", "z" * 65)
+    assert_equal "hashtable", r("OBJECT", "ENCODING", "h")
+  end
+
+  def test_object_encoding_zset_transition
+    r("ZADD", "z", "1", "a")
+    assert_equal "listpack", r("OBJECT", "ENCODING", "z")
+    r("ZADD", "z", "2", "b" * 65)
+    assert_equal "skiplist", r("OBJECT", "ENCODING", "z")
   end
 end

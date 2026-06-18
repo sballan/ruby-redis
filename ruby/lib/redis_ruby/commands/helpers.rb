@@ -17,6 +17,7 @@ module RedisRuby
         client.db.signal_modified(key)
         client.server.signal_key_ready(client.db_index, key)
         client.server.notify_dirty(changes)
+        client.notify_keys << key
       end
 
       # Bump dirtiness without a specific key (FLUSHDB, etc.).

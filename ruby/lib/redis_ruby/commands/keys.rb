@@ -285,7 +285,7 @@ module RedisRuby
         raise CommandError.generic("no such key") if value.nil?
 
         case sub
-        when "encoding" then Types.encoding_for(value).serialize
+        when "encoding" then Types.encoding_for(value, client.server.config).serialize
         when "refcount" then 1
         when "idletime" then 0
         when "freq" then 0

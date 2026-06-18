@@ -127,7 +127,7 @@ module RedisRuby
         value = client.db.lookup(key)
         raise CommandError.generic("no such key") if value.nil?
 
-        encoding = Types.encoding_for(value).serialize
+        encoding = Types.encoding_for(value, client.server.config).serialize
         Reply::SimpleString.new("Value at:0x0 refcount:1 encoding:#{encoding} serializedlength:0 lru:0 lru_seconds_idle:0")
       end
 

@@ -123,6 +123,198 @@ module RedisRuby
         result.bytesize
       end
 
+      BITFIELD_MAX_BYTE = T.let((512 * 1024 * 1024) - 1, Integer) # last touched byte must be < 512MB
+
+      sig { params(client: Client, argv: T::Array[String]).returns(T.untyped) }
+      def self.bitfield(client, argv) = bitfield_generic(client, argv, readonly: false)
+
+      sig { params(client: Client, argv: T::Array[String]).returns(T.untyped) }
+      def self.bitfield_ro(client, argv) = bitfield_generic(client, argv, readonly: true)
+
+      sig { params(client: Client, argv: T::Array[String], readonly: T::Boolean).returns(T.untyped) }
+      def self.bitfield_generic(client, argv, readonly:)
+        key = T.must(argv[1])
+        buffer = (client.db.lookup_string(key) || +"".b).dup
+        results = T.let([], T::Array[T.untyped])
+        overflow = T.let(:wrap, Symbol)
+        wrote = T.let(false, T::Boolean)
+
+        index = 2
+        while index < argv.length
+          op = T.must(argv[index]).downcase
+          case op
+          when "get"
+            raise CommandError.syntax if index + 2 >= argv.length
+
+            bits, signed = parse_bitfield_type(T.must(argv[index + 1]))
+            bitoffset = parse_bitfield_offset(T.must(argv[index + 2]), bits)
+            results << bitfield_read(buffer, bitoffset, bits, signed)
+            index += 3
+          when "set"
+            raise CommandError.generic("BITFIELD_RO only supports the GET subcommand") if readonly
+            raise CommandError.syntax if index + 3 >= argv.length
+
+            bits, signed = parse_bitfield_type(T.must(argv[index + 1]))
+            bitoffset = parse_bitfield_offset(T.must(argv[index + 2]), bits)
+            old = bitfield_read(buffer, bitoffset, bits, signed)
+            value, ok = apply_overflow(Helpers.int(T.must(argv[index + 3])), bits, signed, overflow)
+            if ok
+              set_bits(buffer, bitoffset, bits, value)
+              wrote = true
+              results << old
+            else
+              results << nil
+            end
+            index += 4
+          when "incrby"
+            raise CommandError.generic("BITFIELD_RO only supports the GET subcommand") if readonly
+            raise CommandError.syntax if index + 3 >= argv.length
+
+            bits, signed = parse_bitfield_type(T.must(argv[index + 1]))
+            bitoffset = parse_bitfield_offset(T.must(argv[index + 2]), bits)
+            current = bitfield_read(buffer, bitoffset, bits, signed)
+            incr = Helpers.int(T.must(argv[index + 3]))
+            value, ok = apply_overflow(current + incr, bits, signed, overflow)
+            if ok
+              set_bits(buffer, bitoffset, bits, value)
+              wrote = true
+              results << value
+            else
+              results << nil
+            end
+            index += 4
+          when "overflow"
+            raise CommandError.generic("BITFIELD_RO only supports the GET subcommand") if readonly
+            raise CommandError.syntax if index + 1 >= argv.length
+
+            mode = T.must(argv[index + 1]).downcase
+            case mode
+            when "wrap" then overflow = :wrap
+            when "sat" then overflow = :sat
+            when "fail" then overflow = :fail
+            else raise CommandError.generic("Invalid OVERFLOW type specified")
+            end
+            index += 2
+          else
+            raise CommandError.syntax
+          end
+        end
+
+        if wrote
+          client.db.set(key, buffer)
+          Helpers.touch(client, key)
+        end
+        results
+      end
+
+      # Parse a bitfield type token like "u8" or "i16". Returns [bits, signed].
+      sig { params(token: String).returns([Integer, T::Boolean]) }
+      def self.parse_bitfield_type(token)
+        error = CommandError.generic(
+          "Invalid bitfield type. Use something like i16 u8. Note that u64 is not supported but i64 is."
+        )
+        raise error if token.length < 2
+
+        sign = token[0]
+        raise error unless %w[u i].include?(T.must(sign))
+
+        width_str = T.must(token[1..])
+        raise error unless width_str.match?(/\A\d+\z/)
+
+        bits = width_str.to_i
+        signed = sign == "i"
+        if signed
+          raise error unless bits >= 1 && bits <= 64
+        else
+          raise error unless bits >= 1 && bits <= 63
+        end
+        [bits, signed]
+      end
+
+      # Parse an offset token: a bit offset, or "#<n>" meaning n * bits.
+      sig { params(token: String, bits: Integer).returns(Integer) }
+      def self.parse_bitfield_offset(token, bits)
+        offset =
+          if token.start_with?("#")
+            Helpers.int(T.must(token[1..])) * bits
+          else
+            Helpers.int(token)
+          end
+        out_of_range = CommandError.generic("bit offset is not an integer or out of range")
+        raise out_of_range if offset.negative?
+        raise out_of_range if ((offset + bits - 1) >> 3) > BITFIELD_MAX_BYTE
+
+        offset
+      end
+
+      # Read a `bits`-wide integer at `bitoffset` (big-endian bit order). Bytes
+      # past the buffer end read as 0. Sign-extends when `signed` and top bit set.
+      sig { params(buffer: String, bitoffset: Integer, bits: Integer, signed: T::Boolean).returns(Integer) }
+      def self.bitfield_read(buffer, bitoffset, bits, signed)
+        value = get_unsigned(buffer, bitoffset, bits)
+        value -= (1 << bits) if signed && (value & (1 << (bits - 1))) != 0
+        value
+      end
+
+      # Read `bits` bits as an unsigned integer; bytes past the end read as 0.
+      sig { params(buffer: String, bitoffset: Integer, bits: Integer).returns(Integer) }
+      def self.get_unsigned(buffer, bitoffset, bits)
+        value = 0
+        bits.times { |k| value = (value << 1) | bit_at(buffer, bitoffset + k) }
+        value
+      end
+
+      # Write the low `bits` bits of `value` at `bitoffset`, growing the buffer.
+      sig { params(buffer: String, bitoffset: Integer, bits: Integer, value: Integer).void }
+      def self.set_bits(buffer, bitoffset, bits, value)
+        last_byte = (bitoffset + bits - 1) >> 3
+        buffer << ("\x00".b * (last_byte + 1 - buffer.bytesize)) if last_byte >= buffer.bytesize
+
+        bits.times do |k|
+          bit = (value >> (bits - 1 - k)) & 1
+          index = bitoffset + k
+          byte_index = index >> 3
+          shift = 7 - (index & 7)
+          current = T.must(buffer.getbyte(byte_index))
+          updated = bit == 1 ? (current | (1 << shift)) : (current & ~(1 << shift))
+          buffer.setbyte(byte_index, updated)
+        end
+      end
+
+      # Apply the overflow mode to `value` for a `bits`-wide field. Returns
+      # [adjusted_value, ok]; ok is false only for :fail when out of range.
+      sig { params(value: Integer, bits: Integer, signed: T::Boolean, mode: Symbol).returns([Integer, T::Boolean]) }
+      def self.apply_overflow(value, bits, signed, mode)
+        if signed
+          lo = -(1 << (bits - 1))
+          hi = (1 << (bits - 1)) - 1
+        else
+          lo = 0
+          hi = (1 << bits) - 1
+        end
+
+        case mode
+        when :sat
+          return [lo, true] if value < lo
+          return [hi, true] if value > hi
+
+          [value, true]
+        when :fail
+          return [value, false] if value < lo || value > hi
+
+          [value, true]
+        else # :wrap
+          if signed
+            modulus = 1 << bits
+            wrapped = value % modulus
+            wrapped -= modulus if wrapped > hi
+            [wrapped, true]
+          else
+            [value & hi, true]
+          end
+        end
+      end
+
       # --- Internals ---------------------------------------------------------
 
       sig { params(buffer: String, bit_index: Integer).returns(Integer) }
@@ -174,6 +366,8 @@ module RedisRuby
         table.add("bitcount", -2, [CommandFlag::Readonly]) { |c, a| bitcount(c, a) }
         table.add("bitpos", -3, [CommandFlag::Readonly]) { |c, a| bitpos(c, a) }
         table.add("bitop", -4, [CommandFlag::Write]) { |c, a| bitop(c, a) }
+        table.add("bitfield", -2, [CommandFlag::Write]) { |c, a| bitfield(c, a) }
+        table.add("bitfield_ro", -2, [CommandFlag::Readonly]) { |c, a| bitfield_ro(c, a) }
       end
     end
   end
