@@ -84,6 +84,30 @@ module RedisRuby
     sig { returns(ReplyMode) }
     attr_accessor :reply_mode
 
+    # Blocking state (BLPOP/BRPOP/BLMOVE/BLMPOP/BZPOP*/WAIT). While +blocked+ is
+    # set the reactor stops processing this client's input; the command is
+    # retried via +block_attempt+ whenever one of +block_keys+ is signaled
+    # ready, and answered with +block_timeout_reply+ once +block_deadline+
+    # (monotonic ms; nil means wait forever) passes. +deny_blocking+ is raised
+    # while running queued commands during EXEC, where blocking must not happen.
+    sig { returns(T::Boolean) }
+    attr_accessor :deny_blocking
+
+    sig { returns(T::Array[String]) }
+    attr_reader :block_keys
+
+    sig { returns(Integer) }
+    attr_reader :block_db_index
+
+    sig { returns(T.nilable(Float)) }
+    attr_reader :block_deadline
+
+    sig { returns(T.untyped) }
+    attr_reader :block_timeout_reply
+
+    sig { returns(T.nilable(T.proc.returns(T.untyped))) }
+    attr_reader :block_attempt
+
     sig { returns(String) }
     attr_accessor :lib_name
 
@@ -121,6 +145,14 @@ module RedisRuby
       @skip_reply = T.let(false, T::Boolean)
       @lib_name = T.let("", String)
       @lib_ver = T.let("", String)
+
+      @deny_blocking = T.let(false, T::Boolean)
+      @blocked = T.let(false, T::Boolean)
+      @block_keys = T.let([], T::Array[String])
+      @block_db_index = T.let(0, Integer)
+      @block_deadline = T.let(nil, T.nilable(Float))
+      @block_timeout_reply = T.let(nil, T.untyped)
+      @block_attempt = T.let(nil, T.nilable(T.proc.returns(T.untyped)))
     end
 
     # --- Output ------------------------------------------------------------
@@ -165,6 +197,42 @@ module RedisRuby
     # In RESP2 a subscribed client may only issue a restricted command set.
     sig { returns(T::Boolean) }
     def subscribe_mode? = @protocol == 2 && subscription_count.positive?
+
+    # --- Blocking ----------------------------------------------------------
+
+    sig { returns(T::Boolean) }
+    def blocked? = @blocked
+
+    # Park this client on +keys+ (in its current database) until one is
+    # signaled ready or +timeout+ seconds elapse (0 = forever). +attempt+ is
+    # re-run on each wake and returns the reply to send, or Blocking::WOULD_BLOCK
+    # to keep waiting; +on_timeout+ is the reply sent when the deadline passes.
+    sig do
+      params(
+        keys: T::Array[String],
+        timeout: Float,
+        on_timeout: T.untyped,
+        attempt: T.proc.returns(T.untyped),
+      ).void
+    end
+    def block_on(keys, timeout, on_timeout, &attempt)
+      @blocked = true
+      @block_keys = keys.dup
+      @block_db_index = @db_index
+      @block_deadline = timeout.zero? ? nil : Util.mono_ms + (timeout * 1000)
+      @block_timeout_reply = on_timeout
+      @block_attempt = attempt
+      @server.register_blocked(self)
+    end
+
+    sig { void }
+    def clear_block
+      @blocked = false
+      @block_keys = []
+      @block_deadline = nil
+      @block_timeout_reply = nil
+      @block_attempt = nil
+    end
 
     # --- Transactions ------------------------------------------------------
 

@@ -99,9 +99,16 @@ module RedisRuby
       def initialize(elements) = (@elements = elements)
     end
 
+    # A null array (*-1 in RESP2, _ in RESP3), distinct from a null bulk string
+    # ($-1). The timeout reply of the blocking commands that would otherwise
+    # answer with an array (BLPOP/BRPOP, BZPOPMIN/BZPOPMAX, BLMPOP/BZMPOP).
+    class NullArray; end
+
     # Sentinel meaning "produce no reply at all" (used by CLIENT REPLY OFF/SKIP
     # and by commands whose reply is delivered asynchronously, e.g. blocking).
     NO_REPLY = T.let(Object.new.freeze, Object)
+
+    NULL_ARRAY = T.let(NullArray.new.freeze, NullArray)
 
     OK = T.let(SimpleString.new("OK"), SimpleString)
     PONG = T.let(SimpleString.new("PONG"), SimpleString)

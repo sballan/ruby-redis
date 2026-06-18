@@ -17,6 +17,11 @@ module RedisRuby
     sig { returns(T::Hash[String, Integer]) }
     attr_reader :expires
 
+    # Shared empty result for keys with no blocked clients; never mutated.
+    # (Typed untyped so the constant doesn't reference Client at load time,
+    # before client.rb is required.)
+    NO_WAITERS = T.let([].freeze, T::Array[T.untyped])
+
     sig { params(index: Integer, server: Server).void }
     def initialize(index, server)
       @index = index
@@ -24,6 +29,7 @@ module RedisRuby
       @dict = T.let({}, T::Hash[String, T.untyped])
       @expires = T.let({}, T::Hash[String, Integer])
       @watchers = T.let({}, T::Hash[String, T::Array[Client]])
+      @blocked = T.let({}, T::Hash[String, T::Array[Client]])
     end
 
     # --- Reads -------------------------------------------------------------
@@ -204,5 +210,27 @@ module RedisRuby
     def signal_flush
       @watchers.each_value { |clients| clients.each { |client| client.cas_dirty = true } }
     end
+
+    # --- Blocking (BLPOP/BRPOP/...) ----------------------------------------
+    #
+    # Clients parked on a key are kept in arrival order so the reactor can
+    # serve them first-come-first-served when the key is signaled ready.
+
+    sig { params(key: String, client: Client).void }
+    def add_blocked(key, client)
+      (@blocked[key] ||= []) << client
+    end
+
+    sig { params(key: String, client: Client).void }
+    def remove_blocked(key, client)
+      waiters = @blocked[key]
+      return if waiters.nil?
+
+      waiters.delete(client)
+      @blocked.delete(key) if waiters.empty?
+    end
+
+    sig { params(key: String).returns(T::Array[Client]) }
+    def blocked_clients_on(key) = @blocked[key] || NO_WAITERS
   end
 end

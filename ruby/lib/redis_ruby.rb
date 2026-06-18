@@ -42,6 +42,7 @@ require_relative "redis_ruby/commands/sets"
 require_relative "redis_ruby/commands/sorted_sets"
 require_relative "redis_ruby/commands/transactions"
 require_relative "redis_ruby/commands/pubsub_commands"
+require_relative "redis_ruby/commands/blocking"
 
 require_relative "redis_ruby/persistence/rdb"
 require_relative "redis_ruby/server"
