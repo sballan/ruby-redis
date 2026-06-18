@@ -282,27 +282,27 @@ module RedisRuby
 
       sig { params(table: CommandTable).void }
       def self.install(table)
-        table.add("get", 2, %i[readonly fast]) { |c, a| get(c, a) }
-        table.add("getdel", 2, %i[write fast]) { |c, a| getdel(c, a) }
-        table.add("getex", -2, %i[write fast]) { |c, a| getex(c, a) }
-        table.add("set", -3, %i[write]) { |c, a| set(c, a) }
-        table.add("setnx", 3, %i[write fast]) { |c, a| setnx(c, a) }
-        table.add("setex", 4, %i[write]) { |c, a| setex(c, a) }
-        table.add("psetex", 4, %i[write]) { |c, a| psetex(c, a) }
-        table.add("getset", 3, %i[write fast]) { |c, a| getset(c, a) }
-        table.add("append", 3, %i[write fast]) { |c, a| append(c, a) }
-        table.add("strlen", 2, %i[readonly fast]) { |c, a| strlen(c, a) }
-        table.add("mget", -2, %i[readonly fast]) { |c, a| mget(c, a) }
-        table.add("mset", -3, %i[write]) { |c, a| mset(c, a) }
-        table.add("msetnx", -3, %i[write]) { |c, a| msetnx(c, a) }
-        table.add("incr", 2, %i[write fast]) { |c, a| incr(c, a) }
-        table.add("decr", 2, %i[write fast]) { |c, a| decr(c, a) }
-        table.add("incrby", 3, %i[write fast]) { |c, a| incrby(c, a) }
-        table.add("decrby", 3, %i[write fast]) { |c, a| decrby(c, a) }
-        table.add("incrbyfloat", 3, %i[write fast]) { |c, a| incrbyfloat(c, a) }
-        table.add("getrange", 4, %i[readonly]) { |c, a| getrange(c, a) }
-        table.add("substr", 4, %i[readonly]) { |c, a| getrange(c, a) }
-        table.add("setrange", 4, %i[write]) { |c, a| setrange(c, a) }
+        table.add("get", 2, [CommandFlag::Readonly, CommandFlag::Fast]) { |c, a| get(c, a) }
+        table.add("getdel", 2, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| getdel(c, a) }
+        table.add("getex", -2, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| getex(c, a) }
+        table.add("set", -3, [CommandFlag::Write]) { |c, a| set(c, a) }
+        table.add("setnx", 3, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| setnx(c, a) }
+        table.add("setex", 4, [CommandFlag::Write]) { |c, a| setex(c, a) }
+        table.add("psetex", 4, [CommandFlag::Write]) { |c, a| psetex(c, a) }
+        table.add("getset", 3, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| getset(c, a) }
+        table.add("append", 3, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| append(c, a) }
+        table.add("strlen", 2, [CommandFlag::Readonly, CommandFlag::Fast]) { |c, a| strlen(c, a) }
+        table.add("mget", -2, [CommandFlag::Readonly, CommandFlag::Fast]) { |c, a| mget(c, a) }
+        table.add("mset", -3, [CommandFlag::Write]) { |c, a| mset(c, a) }
+        table.add("msetnx", -3, [CommandFlag::Write]) { |c, a| msetnx(c, a) }
+        table.add("incr", 2, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| incr(c, a) }
+        table.add("decr", 2, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| decr(c, a) }
+        table.add("incrby", 3, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| incrby(c, a) }
+        table.add("decrby", 3, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| decrby(c, a) }
+        table.add("incrbyfloat", 3, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| incrbyfloat(c, a) }
+        table.add("getrange", 4, [CommandFlag::Readonly]) { |c, a| getrange(c, a) }
+        table.add("substr", 4, [CommandFlag::Readonly]) { |c, a| getrange(c, a) }
+        table.add("setrange", 4, [CommandFlag::Write]) { |c, a| setrange(c, a) }
       end
     end
   end

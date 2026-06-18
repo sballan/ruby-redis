@@ -299,23 +299,23 @@ module RedisRuby
 
       sig { params(table: CommandTable).void }
       def self.install(table)
-        table.add("lpush", -3, %i[write fast]) { |c, a| lpush(c, a) }
-        table.add("rpush", -3, %i[write fast]) { |c, a| rpush(c, a) }
-        table.add("lpushx", -3, %i[write fast]) { |c, a| lpushx(c, a) }
-        table.add("rpushx", -3, %i[write fast]) { |c, a| rpushx(c, a) }
-        table.add("lpop", -2, %i[write fast]) { |c, a| lpop(c, a) }
-        table.add("rpop", -2, %i[write fast]) { |c, a| rpop(c, a) }
-        table.add("llen", 2, %i[readonly fast]) { |c, a| llen(c, a) }
-        table.add("lrange", 4, %i[readonly]) { |c, a| lrange(c, a) }
-        table.add("lindex", 3, %i[readonly]) { |c, a| lindex(c, a) }
-        table.add("lset", 4, %i[write]) { |c, a| lset(c, a) }
-        table.add("linsert", 5, %i[write]) { |c, a| linsert(c, a) }
-        table.add("lrem", 4, %i[write]) { |c, a| lrem(c, a) }
-        table.add("ltrim", 4, %i[write]) { |c, a| ltrim(c, a) }
-        table.add("rpoplpush", 3, %i[write]) { |c, a| rpoplpush(c, a) }
-        table.add("lmove", 5, %i[write]) { |c, a| lmove(c, a) }
-        table.add("lpos", -3, %i[readonly]) { |c, a| lpos(c, a) }
-        table.add("lmpop", -4, %i[write]) { |c, a| lmpop(c, a) }
+        table.add("lpush", -3, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| lpush(c, a) }
+        table.add("rpush", -3, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| rpush(c, a) }
+        table.add("lpushx", -3, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| lpushx(c, a) }
+        table.add("rpushx", -3, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| rpushx(c, a) }
+        table.add("lpop", -2, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| lpop(c, a) }
+        table.add("rpop", -2, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| rpop(c, a) }
+        table.add("llen", 2, [CommandFlag::Readonly, CommandFlag::Fast]) { |c, a| llen(c, a) }
+        table.add("lrange", 4, [CommandFlag::Readonly]) { |c, a| lrange(c, a) }
+        table.add("lindex", 3, [CommandFlag::Readonly]) { |c, a| lindex(c, a) }
+        table.add("lset", 4, [CommandFlag::Write]) { |c, a| lset(c, a) }
+        table.add("linsert", 5, [CommandFlag::Write]) { |c, a| linsert(c, a) }
+        table.add("lrem", 4, [CommandFlag::Write]) { |c, a| lrem(c, a) }
+        table.add("ltrim", 4, [CommandFlag::Write]) { |c, a| ltrim(c, a) }
+        table.add("rpoplpush", 3, [CommandFlag::Write]) { |c, a| rpoplpush(c, a) }
+        table.add("lmove", 5, [CommandFlag::Write]) { |c, a| lmove(c, a) }
+        table.add("lpos", -3, [CommandFlag::Readonly]) { |c, a| lpos(c, a) }
+        table.add("lmpop", -4, [CommandFlag::Write]) { |c, a| lmpop(c, a) }
       end
     end
   end

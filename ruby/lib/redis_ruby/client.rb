@@ -2,6 +2,15 @@
 # frozen_string_literal: true
 
 module RedisRuby
+  # Whether replies are sent to a client, toggled by CLIENT REPLY ON/OFF.
+  # (The transient SKIP behavior is tracked separately by a one-shot flag.)
+  class ReplyMode < T::Enum
+    enums do
+      On = new("on")
+      Off = new("off")
+    end
+  end
+
   # Per-connection state: the socket, parse buffer, pending output, the
   # selected database, and the transaction / pub-sub / auth bookkeeping that
   # commands manipulate. One Client exists per connected socket.
@@ -72,7 +81,7 @@ module RedisRuby
     sig { returns(T::Hash[String, TrueClass]) }
     attr_reader :sub_shard
 
-    sig { returns(Symbol) }
+    sig { returns(ReplyMode) }
     attr_accessor :reply_mode
 
     sig { returns(String) }
@@ -108,7 +117,7 @@ module RedisRuby
       @sub_patterns = T.let({}, T::Hash[String, TrueClass])
       @sub_shard = T.let({}, T::Hash[String, TrueClass])
 
-      @reply_mode = T.let(:on, Symbol)
+      @reply_mode = T.let(ReplyMode::On, ReplyMode)
       @skip_reply = T.let(false, T::Boolean)
       @lib_name = T.let("", String)
       @lib_ver = T.let("", String)
@@ -121,7 +130,7 @@ module RedisRuby
     sig { params(value: T.untyped).void }
     def queue_reply(value)
       return if value.equal?(Reply::NO_REPLY)
-      return if @reply_mode == :off
+      return if @reply_mode == ReplyMode::Off
 
       if @skip_reply
         @skip_reply = false

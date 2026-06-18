@@ -10,43 +10,70 @@ module RedisRuby
   module Types
     extend T::Sig
 
-    # The Redis type name for a stored value, as reported by the TYPE command.
-    sig { params(value: T.untyped).returns(String) }
-    def self.name_for(value)
-      case value
-      when nil then "none"
-      when String then "string"
-      when List then "list"
-      when Set then "set"
-      when SortedSet then "zset"
-      when Hash then "hash"
-      else "unknown"
+    # The Redis type name for a stored value, as reported by the TYPE command
+    # and used to filter SCAN results. The serialized value of each member is
+    # exactly what goes on the wire.
+    class ValueType < T::Enum
+      enums do
+        None = new("none")
+        String = new("string")
+        List = new("list")
+        Set = new("set")
+        ZSet = new("zset")
+        Hash = new("hash")
+        Unknown = new("unknown")
       end
     end
 
     # The OBJECT ENCODING name. We don't model the memory-optimized encodings
-    # (listpack/intset/ziplist) so we report the unconverted encoding names.
-    sig { params(value: T.untyped).returns(String) }
-    def self.encoding_for(value)
-      case value
-      when String then string_encoding(value)
-      when List then "quicklist"
-      when Set then "hashtable"
-      when SortedSet then "skiplist"
-      when Hash then "hashtable"
-      else "raw"
+    # (listpack/intset/ziplist), so we only ever report the unconverted names.
+    class ObjectEncoding < T::Enum
+      enums do
+        Int = new("int")
+        Embstr = new("embstr")
+        Raw = new("raw")
+        Quicklist = new("quicklist")
+        Hashtable = new("hashtable")
+        Skiplist = new("skiplist")
       end
     end
 
-    sig { params(value: String).returns(String) }
+    # The Redis type of a stored value, as reported by the TYPE command.
+    sig { params(value: T.untyped).returns(ValueType) }
+    def self.name_for(value)
+      case value
+      when nil then ValueType::None
+      when String then ValueType::String
+      when List then ValueType::List
+      when Set then ValueType::Set
+      when SortedSet then ValueType::ZSet
+      when Hash then ValueType::Hash
+      else ValueType::Unknown
+      end
+    end
+
+    # The OBJECT ENCODING of a stored value.
+    sig { params(value: T.untyped).returns(ObjectEncoding) }
+    def self.encoding_for(value)
+      case value
+      when String then string_encoding(value)
+      when List then ObjectEncoding::Quicklist
+      when Set then ObjectEncoding::Hashtable
+      when SortedSet then ObjectEncoding::Skiplist
+      when Hash then ObjectEncoding::Hashtable
+      else ObjectEncoding::Raw
+      end
+    end
+
+    sig { params(value: String).returns(ObjectEncoding) }
     def self.string_encoding(value)
       if value.bytesize <= 20 && Util::INTEGER_RE.match?(value) &&
          value.to_i.between?(Util::INT64_MIN, Util::INT64_MAX)
-        "int"
+        ObjectEncoding::Int
       elsif value.bytesize <= 44
-        "embstr"
+        ObjectEncoding::Embstr
       else
-        "raw"
+        ObjectEncoding::Raw
       end
     end
   end

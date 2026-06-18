@@ -127,7 +127,7 @@ module RedisRuby
         value = client.db.lookup(key)
         raise CommandError.generic("no such key") if value.nil?
 
-        encoding = Types.encoding_for(value)
+        encoding = Types.encoding_for(value).serialize
         Reply::SimpleString.new("Value at:0x0 refcount:1 encoding:#{encoding} serializedlength:0 lru:0 lru_seconds_idle:0")
       end
 
@@ -141,18 +141,18 @@ module RedisRuby
 
       sig { params(table: CommandTable).void }
       def self.install(table)
-        table.add("flushdb", -1, %i[write]) { |c, a| flushdb(c, a) }
-        table.add("flushall", -1, %i[write]) { |c, a| flushall(c, a) }
-        table.add("time", 1, %i[loading fast]) { |c, a| time(c, a) }
-        table.add("lastsave", 1, %i[loading fast]) { |c, a| lastsave(c, a) }
-        table.add("save", 1, %i[admin]) { |c, a| save(c, a) }
-        table.add("bgsave", -1, %i[admin]) { |c, a| bgsave(c, a) }
-        table.add("bgrewriteaof", 1, %i[admin]) { |c, a| bgrewriteaof(c, a) }
-        table.add("shutdown", -1, %i[admin loading no_multi]) { |c, a| shutdown(c, a) }
-        table.add("lolwut", -1, %i[readonly fast]) { |c, a| lolwut(c, a) }
-        table.add("config", -2, %i[admin loading]) { |c, a| config(c, a) }
-        table.add("debug", -2, %i[admin loading]) { |c, a| debug(c, a) }
-        table.add("info", -1, %i[loading]) { |c, a| info(c, a) }
+        table.add("flushdb", -1, [CommandFlag::Write]) { |c, a| flushdb(c, a) }
+        table.add("flushall", -1, [CommandFlag::Write]) { |c, a| flushall(c, a) }
+        table.add("time", 1, [CommandFlag::Loading, CommandFlag::Fast]) { |c, a| time(c, a) }
+        table.add("lastsave", 1, [CommandFlag::Loading, CommandFlag::Fast]) { |c, a| lastsave(c, a) }
+        table.add("save", 1, [CommandFlag::Admin]) { |c, a| save(c, a) }
+        table.add("bgsave", -1, [CommandFlag::Admin]) { |c, a| bgsave(c, a) }
+        table.add("bgrewriteaof", 1, [CommandFlag::Admin]) { |c, a| bgrewriteaof(c, a) }
+        table.add("shutdown", -1, [CommandFlag::Admin, CommandFlag::Loading, CommandFlag::NoMulti]) { |c, a| shutdown(c, a) }
+        table.add("lolwut", -1, [CommandFlag::Readonly, CommandFlag::Fast]) { |c, a| lolwut(c, a) }
+        table.add("config", -2, [CommandFlag::Admin, CommandFlag::Loading]) { |c, a| config(c, a) }
+        table.add("debug", -2, [CommandFlag::Admin, CommandFlag::Loading]) { |c, a| debug(c, a) }
+        table.add("info", -1, [CommandFlag::Loading]) { |c, a| info(c, a) }
       end
     end
   end

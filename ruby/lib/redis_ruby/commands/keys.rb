@@ -33,7 +33,7 @@ module RedisRuby
 
       sig { params(client: Client, argv: T::Array[String]).returns(T.untyped) }
       def self.type(client, argv)
-        Reply::SimpleString.new(Types.name_for(client.db.lookup(T.must(argv[1]))))
+        Reply::SimpleString.new(Types.name_for(client.db.lookup(T.must(argv[1]))).serialize)
       end
 
       # --- Expiration --------------------------------------------------------
@@ -175,7 +175,7 @@ module RedisRuby
         result = slice.select do |key|
           client.db.exists?(key) &&
             (match.nil? || Util.glob_match?(match, key)) &&
-            (type.nil? || Types.name_for(client.db.lookup(key)) == type)
+            (type.nil? || Types.name_for(client.db.lookup(key)).serialize == type)
         end
         [next_cursor.to_s, result]
       end
@@ -285,7 +285,7 @@ module RedisRuby
         raise CommandError.generic("no such key") if value.nil?
 
         case sub
-        when "encoding" then Types.encoding_for(value)
+        when "encoding" then Types.encoding_for(value).serialize
         when "refcount" then 1
         when "idletime" then 0
         when "freq" then 0
@@ -310,29 +310,29 @@ module RedisRuby
 
       sig { params(table: CommandTable).void }
       def self.install(table)
-        table.add("del", -2, %i[write]) { |c, a| del(c, a) }
-        table.add("unlink", -2, %i[write fast]) { |c, a| del(c, a) }
-        table.add("exists", -2, %i[readonly fast]) { |c, a| exists(c, a) }
-        table.add("touch", -2, %i[readonly fast]) { |c, a| touch(c, a) }
-        table.add("type", 2, %i[readonly fast]) { |c, a| type(c, a) }
-        table.add("expire", -3, %i[write fast]) { |c, a| expire(c, a) }
-        table.add("pexpire", -3, %i[write fast]) { |c, a| pexpire(c, a) }
-        table.add("expireat", -3, %i[write fast]) { |c, a| expireat(c, a) }
-        table.add("pexpireat", -3, %i[write fast]) { |c, a| pexpireat(c, a) }
-        table.add("persist", 2, %i[write fast]) { |c, a| persist(c, a) }
-        table.add("ttl", 2, %i[readonly fast]) { |c, a| ttl(c, a) }
-        table.add("pttl", 2, %i[readonly fast]) { |c, a| pttl(c, a) }
-        table.add("expiretime", 2, %i[readonly fast]) { |c, a| expiretime(c, a) }
-        table.add("pexpiretime", 2, %i[readonly fast]) { |c, a| pexpiretime(c, a) }
-        table.add("keys", 2, %i[readonly]) { |c, a| keys(c, a) }
-        table.add("randomkey", 1, %i[readonly]) { |c, a| randomkey(c, a) }
-        table.add("dbsize", 1, %i[readonly fast]) { |c, a| dbsize(c, a) }
-        table.add("scan", -2, %i[readonly]) { |c, a| scan(c, a) }
-        table.add("rename", 3, %i[write]) { |c, a| rename(c, a) }
-        table.add("renamenx", 3, %i[write fast]) { |c, a| renamenx(c, a) }
-        table.add("copy", -3, %i[write]) { |c, a| copy(c, a) }
-        table.add("move", 3, %i[write fast]) { |c, a| move(c, a) }
-        table.add("object", -2, %i[readonly]) { |c, a| object(c, a) }
+        table.add("del", -2, [CommandFlag::Write]) { |c, a| del(c, a) }
+        table.add("unlink", -2, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| del(c, a) }
+        table.add("exists", -2, [CommandFlag::Readonly, CommandFlag::Fast]) { |c, a| exists(c, a) }
+        table.add("touch", -2, [CommandFlag::Readonly, CommandFlag::Fast]) { |c, a| touch(c, a) }
+        table.add("type", 2, [CommandFlag::Readonly, CommandFlag::Fast]) { |c, a| type(c, a) }
+        table.add("expire", -3, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| expire(c, a) }
+        table.add("pexpire", -3, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| pexpire(c, a) }
+        table.add("expireat", -3, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| expireat(c, a) }
+        table.add("pexpireat", -3, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| pexpireat(c, a) }
+        table.add("persist", 2, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| persist(c, a) }
+        table.add("ttl", 2, [CommandFlag::Readonly, CommandFlag::Fast]) { |c, a| ttl(c, a) }
+        table.add("pttl", 2, [CommandFlag::Readonly, CommandFlag::Fast]) { |c, a| pttl(c, a) }
+        table.add("expiretime", 2, [CommandFlag::Readonly, CommandFlag::Fast]) { |c, a| expiretime(c, a) }
+        table.add("pexpiretime", 2, [CommandFlag::Readonly, CommandFlag::Fast]) { |c, a| pexpiretime(c, a) }
+        table.add("keys", 2, [CommandFlag::Readonly]) { |c, a| keys(c, a) }
+        table.add("randomkey", 1, [CommandFlag::Readonly]) { |c, a| randomkey(c, a) }
+        table.add("dbsize", 1, [CommandFlag::Readonly, CommandFlag::Fast]) { |c, a| dbsize(c, a) }
+        table.add("scan", -2, [CommandFlag::Readonly]) { |c, a| scan(c, a) }
+        table.add("rename", 3, [CommandFlag::Write]) { |c, a| rename(c, a) }
+        table.add("renamenx", 3, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| renamenx(c, a) }
+        table.add("copy", -3, [CommandFlag::Write]) { |c, a| copy(c, a) }
+        table.add("move", 3, [CommandFlag::Write, CommandFlag::Fast]) { |c, a| move(c, a) }
+        table.add("object", -2, [CommandFlag::Readonly]) { |c, a| object(c, a) }
       end
     end
   end

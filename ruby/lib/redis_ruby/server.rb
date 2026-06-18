@@ -327,7 +327,7 @@ module RedisRuby
       client.sub_channels.clear
       client.sub_patterns.clear
       client.sub_shard.clear
-      client.reply_mode = :on
+      client.reply_mode = ReplyMode::On
       client.protocol = 2
       client.db_index = 0
       client.db = db(0)
