@@ -63,6 +63,9 @@ module RedisRuby
       Commands::Transactions.install(@command_table)
       Commands::PubSubCommands.install(@command_table)
       Commands::Blocking.install(@command_table)
+      Commands::HyperLogLog.install(@command_table)
+      Commands::Geo.install(@command_table)
+      Commands::Streams.install(@command_table)
     end
 
     # --- Database access ---------------------------------------------------

@@ -27,6 +27,22 @@ module RedisRuby
       "logfile" => "",
       "maxclients" => "10000",
       "proto-max-bulk-len" => "536870912",
+      "list-max-listpack-size" => "128",
+      "list-max-ziplist-size" => "128",
+      "hash-max-listpack-entries" => "128",
+      "hash-max-listpack-value" => "64",
+      "hash-max-ziplist-entries" => "128",
+      "hash-max-ziplist-value" => "64",
+      "set-max-intset-entries" => "512",
+      "set-max-listpack-entries" => "128",
+      "set-max-listpack-value" => "64",
+      "zset-max-listpack-entries" => "128",
+      "zset-max-listpack-value" => "64",
+      "zset-max-ziplist-entries" => "128",
+      "zset-max-ziplist-value" => "64",
+      "stream-node-max-entries" => "100",
+      "stream-node-max-bytes" => "4096",
+      "notify-keyspace-events" => "",
     }.freeze, T::Hash[String, String])
 
     sig { void }
