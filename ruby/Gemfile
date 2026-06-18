@@ -1,0 +1,10 @@
+source "https://rubygems.org"
+
+# Sorbet powers the static + runtime type system used across this project.
+gem "sorbet-runtime"
+
+group :development, :test do
+  gem "sorbet", require: false
+  gem "rake", require: false
+  gem "minitest", "~> 5.25"
+end

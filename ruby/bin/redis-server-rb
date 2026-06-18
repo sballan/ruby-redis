@@ -1,0 +1,48 @@
+#!/usr/bin/env ruby
+# typed: false
+# frozen_string_literal: true
+
+require_relative "../lib/redis_ruby"
+
+# Minimal redis.conf-style/CLI option parsing. Accepts an optional leading
+# config file path followed by --name value overrides, mirroring how
+# redis-server is usually launched.
+config = RedisRuby::Config.new
+
+args = ARGV.dup
+if args.first && !args.first.start_with?("--")
+  path = args.shift
+  File.foreach(path) do |line|
+    line = line.strip
+    next if line.empty? || line.start_with?("#")
+
+    name, _, value = line.partition(/\s+/)
+    config.set(name, value.strip.delete_prefix('"').delete_suffix('"'))
+  end
+end
+
+until args.empty?
+  token = args.shift
+  unless token.start_with?("--")
+    warn "unexpected argument: #{token}"
+    exit 1
+  end
+  name = token.delete_prefix("--")
+  values = []
+  values << args.shift until args.empty? || args.first.start_with?("--")
+  config.set(name, values.join(" "))
+end
+
+server = RedisRuby::Server.new(config, verbose: true)
+server.listen
+
+Signal.trap("INT") { server.stop }
+Signal.trap("TERM") { server.stop }
+
+puts <<~BANNER
+  RedisRuby #{RedisRuby::VERSION} (Redis #{RedisRuby::REDIS_VERSION} compatible)
+  Listening on #{config.bind}:#{server.bound_port}
+  PID: #{Process.pid}
+BANNER
+
+server.run
