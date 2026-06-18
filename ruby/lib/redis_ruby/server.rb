@@ -302,7 +302,10 @@ module RedisRuby
 
     sig { params(client: Client, command: Command, argv: T::Array[String]).returns(T.untyped) }
     def call_handler(client, command, argv)
-      command.handler.call(client, argv)
+      client.notify_keys.clear
+      reply = command.handler.call(client, argv)
+      emit_keyspace_events(client, command)
+      reply
     rescue CommandError => e
       Reply::Error.new(e.message)
     rescue StandardError => e
@@ -319,6 +322,86 @@ module RedisRuby
     sig { params(argv: T::Array[String]).returns(String) }
     def format_args(argv)
       (argv[1..] || []).first(20).map { |arg| "'#{arg.byteslice(0, 128)}'" }.join(", ")
+    end
+
+    # --- Keyspace notifications (notify-keyspace-events) -------------------
+    #
+    # Each notifying write command maps to its [event class, event name]. After
+    # a handler returns we fire the event for every key it touched (collected by
+    # Helpers.touch into client.notify_keys). Multi-key commands that emit
+    # different events per key (RENAME, *MOVE) and the secondary "del" emitted
+    # when a collection empties are intentionally out of scope.
+
+    NOTIFY_CLASS_CHAR = T.let({
+      generic: "g", string: "$", list: "l", set: "s", hash: "h",
+      zset: "z", expired: "x", evicted: "e", stream: "t", new: "n", key_miss: "m"
+    }.freeze, T::Hash[Symbol, String])
+
+    KEYSPACE_EVENTS = T.let({
+      "set" => [:string, "set"], "setnx" => [:string, "set"], "setex" => [:string, "set"],
+      "psetex" => [:string, "set"], "getset" => [:string, "set"], "mset" => [:string, "set"],
+      "msetnx" => [:string, "set"], "append" => [:string, "append"], "setrange" => [:string, "setrange"],
+      "incr" => [:string, "incrby"], "decr" => [:string, "decrby"], "incrby" => [:string, "incrby"],
+      "decrby" => [:string, "decrby"], "incrbyfloat" => [:string, "incrbyfloat"], "getdel" => [:generic, "del"],
+      "setbit" => [:string, "setbit"], "bitfield" => [:string, "setbit"], "bitop" => [:string, "set"],
+      "pfadd" => [:string, "pfadd"], "pfmerge" => [:string, "pfadd"],
+      "del" => [:generic, "del"], "unlink" => [:generic, "del"], "expire" => [:generic, "expire"],
+      "pexpire" => [:generic, "pexpire"], "expireat" => [:generic, "expireat"],
+      "pexpireat" => [:generic, "pexpireat"], "persist" => [:generic, "persist"],
+      "lpush" => [:list, "lpush"], "rpush" => [:list, "rpush"], "lpushx" => [:list, "lpush"],
+      "rpushx" => [:list, "rpush"], "lpop" => [:list, "lpop"], "rpop" => [:list, "rpop"],
+      "blpop" => [:list, "lpop"], "brpop" => [:list, "rpop"], "lset" => [:list, "lset"],
+      "linsert" => [:list, "linsert"], "lrem" => [:list, "lrem"], "ltrim" => [:list, "ltrim"],
+      "sadd" => [:set, "sadd"], "srem" => [:set, "srem"], "spop" => [:set, "spop"],
+      "sinterstore" => [:set, "sinterstore"], "sunionstore" => [:set, "sunionstore"],
+      "sdiffstore" => [:set, "sdiffstore"],
+      "hset" => [:hash, "hset"], "hsetnx" => [:hash, "hset"], "hmset" => [:hash, "hset"],
+      "hdel" => [:hash, "hdel"], "hincrby" => [:hash, "hincrby"], "hincrbyfloat" => [:hash, "hincrbyfloat"],
+      "zadd" => [:zset, "zadd"], "zincrby" => [:zset, "zincr"], "zrem" => [:zset, "zrem"],
+      "zpopmin" => [:zset, "zpopmin"], "zpopmax" => [:zset, "zpopmax"],
+      "zremrangebyrank" => [:zset, "zremrangebyrank"], "zremrangebyscore" => [:zset, "zremrangebyscore"],
+      "zremrangebylex" => [:zset, "zremrangebylex"], "zunionstore" => [:zset, "zunionstore"],
+      "zinterstore" => [:zset, "zinterstore"], "zdiffstore" => [:zset, "zdiffstore"],
+      "zrangestore" => [:zset, "zrangestore"], "geoadd" => [:zset, "zadd"],
+      "xadd" => [:stream, "xadd"], "xtrim" => [:stream, "xtrim"], "xdel" => [:stream, "xdel"],
+      "xsetid" => [:stream, "xsetid"]
+    }.freeze, T::Hash[String, [Symbol, String]])
+
+    sig { params(client: Client, command: Command).void }
+    def emit_keyspace_events(client, command)
+      return if client.notify_keys.empty?
+
+      spec = KEYSPACE_EVENTS[command.name.downcase]
+      if spec
+        type = spec[0]
+        event = spec[1]
+        client.notify_keys.uniq.each { |key| notify_keyspace_event(type, event, key, client.db_index) }
+      end
+      client.notify_keys.clear
+    end
+
+    # Publish a keyspace/keyevent notification for +event+ on +key+, honoring
+    # the configured notify-keyspace-events flag string.
+    sig { params(type: Symbol, event: String, key: String, db_index: Integer).void }
+    def notify_keyspace_event(type, event, key, db_index)
+      raw = @config.get("notify-keyspace-events") || ""
+      return if raw.empty?
+
+      keyspace = raw.include?("K")
+      keyevent = raw.include?("E")
+      return unless (keyspace || keyevent) && keyspace_class_enabled?(raw, type)
+
+      @pubsub.publish("__keyspace@#{db_index}__:#{key}", event) if keyspace
+      @pubsub.publish("__keyevent@#{db_index}__:#{event}", key) if keyevent
+    end
+
+    sig { params(raw: String, type: Symbol).returns(T::Boolean) }
+    def keyspace_class_enabled?(raw, type)
+      char = NOTIFY_CLASS_CHAR[type]
+      return false if char.nil?
+      return true if raw.include?("A") && type != :key_miss && type != :new
+
+      raw.include?(char)
     end
 
     # --- WATCH / transactions ---------------------------------------------

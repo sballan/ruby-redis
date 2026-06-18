@@ -114,6 +114,11 @@ module RedisRuby
     sig { returns(String) }
     attr_accessor :lib_ver
 
+    # Keys mutated by the command currently running, collected by Helpers.touch
+    # so the server can fire keyspace notifications after the handler returns.
+    sig { returns(T::Array[String]) }
+    attr_reader :notify_keys
+
     sig { params(id: Integer, socket: IO, addr: String, server: Server).void }
     def initialize(id:, socket:, addr:, server:)
       @id = id
@@ -145,6 +150,7 @@ module RedisRuby
       @skip_reply = T.let(false, T::Boolean)
       @lib_name = T.let("", String)
       @lib_ver = T.let("", String)
+      @notify_keys = T.let([], T::Array[String])
 
       @deny_blocking = T.let(false, T::Boolean)
       @blocked = T.let(false, T::Boolean)

@@ -158,6 +158,7 @@ module RedisRuby
       @dict.delete(key)
       @expires.delete(key)
       signal_modified(key)
+      @server.notify_keyspace_event(:expired, "expired", key, @index)
       @server.notify_dirty(1)
       true
     end
@@ -174,6 +175,7 @@ module RedisRuby
         @dict.delete(key)
         @expires.delete(key)
         signal_modified(key)
+        @server.notify_keyspace_event(:expired, "expired", key, @index)
         evicted += 1
       end
       @server.notify_dirty(evicted) if evicted.positive?
