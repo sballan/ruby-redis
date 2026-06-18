@@ -26,6 +26,8 @@ module RedisRuby
       case value
       when nil
         out << (protocol >= 3 ? "_\r\n" : "$-1\r\n")
+      when Reply::NullArray
+        out << (protocol >= 3 ? "_\r\n" : "*-1\r\n")
       when Integer
         out << ":" << value.to_s << "\r\n"
       when String

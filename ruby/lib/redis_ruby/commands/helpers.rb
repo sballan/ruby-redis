@@ -9,11 +9,13 @@ module RedisRuby
     module Helpers
       extend T::Sig
 
-      # Signal that a key changed: invalidate WATCHers and bump the dirty
-      # counter so snapshotting/save points and LASTSAVE behave correctly.
+      # Signal that a key changed: invalidate WATCHers, wake any clients blocked
+      # on the key (BLPOP and friends), and bump the dirty counter so
+      # snapshotting/save points and LASTSAVE behave correctly.
       sig { params(client: Client, key: String, changes: Integer).void }
       def self.touch(client, key, changes = 1)
         client.db.signal_modified(key)
+        client.server.signal_key_ready(client.db_index, key)
         client.server.notify_dirty(changes)
       end
 

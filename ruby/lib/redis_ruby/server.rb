@@ -44,6 +44,8 @@ module RedisRuby
       @bgsave_pid = T.let(nil, T.nilable(Integer))
       @commands_processed = T.let(0, Integer)
       @connections_received = T.let(0, Integer)
+      @blocked_clients = T.let([], T::Array[Client])
+      @ready_keys = T.let([], T::Array[[Integer, String]])
       install_commands
     end
 
@@ -60,6 +62,7 @@ module RedisRuby
       Commands::Bitmaps.install(@command_table)
       Commands::Transactions.install(@command_table)
       Commands::PubSubCommands.install(@command_table)
+      Commands::Blocking.install(@command_table)
     end
 
     # --- Database access ---------------------------------------------------
@@ -174,7 +177,9 @@ module RedisRuby
 
       data = client.socket.read_nonblock(65_536)
       client.reader << data
-      drain_commands(client)
+      # A blocked client's input is buffered but not processed until it is
+      # unblocked, mirroring Redis' CLIENT_BLOCKED handling.
+      drain_commands(client) unless client.blocked?
     rescue IO::WaitReadable
       nil
     rescue EOFError, Errno::ECONNRESET, Errno::EPIPE, IOError
@@ -189,7 +194,8 @@ module RedisRuby
         next if argv.empty?
 
         dispatch(client, argv)
-        break if client.closing
+        handle_ready_keys
+        break if client.closing || client.blocked?
       end
     rescue ProtocolError => e
       client.queue_reply(Reply::Error.new(e.message))
@@ -217,6 +223,7 @@ module RedisRuby
     def close_client(client)
       return if client.nil?
 
+      unblock_client(client)
       @pubsub.drop(client)
       unwatch_all(client)
       @clients.delete(client.socket)
@@ -279,7 +286,15 @@ module RedisRuby
       return Reply::Error.new("ERR unknown command") unless command
 
       @commands_processed += 1
-      call_handler(client, command, argv)
+      # Blocking commands run during EXEC must not block; they behave like their
+      # non-blocking counterparts and return their empty/timeout reply at once.
+      previous = client.deny_blocking
+      client.deny_blocking = true
+      begin
+        call_handler(client, command, argv)
+      ensure
+        client.deny_blocking = previous
+      end
     end
 
     sig { params(client: Client, command: Command, argv: T::Array[String]).returns(T.untyped) }
@@ -321,6 +336,7 @@ module RedisRuby
 
     sig { params(client: Client).void }
     def reset_client(client)
+      unblock_client(client)
       unwatch_all(client)
       client.reset_multi
       @pubsub.drop(client)
@@ -342,6 +358,101 @@ module RedisRuby
       @databases.each(&:active_expire_cycle)
       reap_bgsave
       maybe_autosave
+      handle_blocked_timeouts
+    end
+
+    # --- Blocking (BLPOP/BRPOP/...) ----------------------------------------
+
+    sig { returns(Integer) }
+    def blocked_count = @blocked_clients.size
+
+    # Number of replicas that have acknowledged writes. We have no replication
+    # yet, so this is always zero (used by WAIT).
+    sig { returns(Integer) }
+    def connected_replicas = 0
+
+    # Register a client (already populated via {Client#block_on}) against each
+    # of its keys so the reactor can find and serve it.
+    sig { params(client: Client).void }
+    def register_blocked(client)
+      database = db(client.block_db_index)
+      client.block_keys.each { |key| database.add_blocked(key, client) }
+      @blocked_clients << client unless @blocked_clients.include?(client)
+    end
+
+    sig { params(client: Client).void }
+    def unblock_client(client)
+      return unless client.blocked?
+
+      database = db(client.block_db_index)
+      client.block_keys.each { |key| database.remove_blocked(key, client) }
+      @blocked_clients.delete(client)
+      client.clear_block
+    end
+
+    # Record that +key+ may now satisfy a blocked client. Cheap no-op unless a
+    # client is actually parked on the key, which keeps the common path free.
+    sig { params(db_index: Integer, key: String).void }
+    def signal_key_ready(db_index, key)
+      return if db(db_index).blocked_clients_on(key).empty?
+
+      entry = T.let([db_index, key], [Integer, String])
+      @ready_keys << entry unless @ready_keys.include?(entry)
+    end
+
+    # Serve clients parked on keys that became ready during command execution.
+    # Re-runs may signal further keys (e.g. BLMOVE pushing onto a watched
+    # destination); the loop drains them all.
+    sig { void }
+    def handle_ready_keys
+      until @ready_keys.empty?
+        entry = T.must(@ready_keys.shift)
+        serve_blocked_on_key(db(entry[0]), entry[1])
+      end
+    end
+
+    sig { params(database: Database, key: String).void }
+    def serve_blocked_on_key(database, key)
+      waiters = database.blocked_clients_on(key)
+      # FIFO: serve the head client repeatedly until the key can't satisfy it,
+      # at which point no later waiter can be satisfied either.
+      break_loop = T.let(false, T::Boolean)
+      until waiters.empty? || break_loop
+        client = T.must(waiters.first)
+        break_loop = !try_serve(client)
+      end
+    end
+
+    sig { params(client: Client).returns(T::Boolean) }
+    def try_serve(client)
+      attempt = client.block_attempt
+      return false if attempt.nil?
+
+      reply = attempt.call
+      return false if reply.equal?(Commands::Blocking::WOULD_BLOCK)
+
+      client.queue_reply(reply)
+      unblock_client(client)
+      true
+    rescue CommandError
+      # The key changed to an incompatible type, etc.: keep the client parked,
+      # exactly as Redis leaves a list blocker waiting through a type change.
+      false
+    end
+
+    sig { void }
+    def handle_blocked_timeouts
+      return if @blocked_clients.empty?
+
+      now = Util.mono_ms
+      expired = @blocked_clients.select do |client|
+        deadline = client.block_deadline
+        !deadline.nil? && deadline <= now
+      end
+      expired.each do |client|
+        client.queue_reply(client.block_timeout_reply)
+        unblock_client(client)
+      end
     end
 
     sig { void }
@@ -478,7 +589,7 @@ module RedisRuby
 
     sig { returns(String) }
     def clients_section
-      "# Clients\r\nconnected_clients:#{@clients.size}\r\nblocked_clients:0\r\ncluster_connections:0"
+      "# Clients\r\nconnected_clients:#{@clients.size}\r\nblocked_clients:#{blocked_count}\r\ncluster_connections:0"
     end
 
     sig { returns(String) }

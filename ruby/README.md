@@ -21,7 +21,7 @@ PONG
 - **Event loop** — a single-threaded `IO.select` reactor, faithful to Redis'
   own design. Command execution is serialized through one loop, which is what
   makes the atomicity guarantees hold without locking.
-- **Data types & ~165 commands**
+- **Data types & ~176 commands**
   - Strings: `GET`/`SET` (with `EX`/`PX`/`EXAT`/`PXAT`/`NX`/`XX`/`KEEPTTL`/`GET`),
     `INCR`/`DECR`/`INCRBYFLOAT`, `APPEND`, `GETRANGE`/`SETRANGE`, `MGET`/`MSET`, …
   - Bitmaps: `SETBIT`, `GETBIT`, `BITCOUNT`, `BITPOS`, `BITOP`.
@@ -39,6 +39,10 @@ PONG
   active key expiration.
 - **Transactions** — `MULTI`/`EXEC`/`DISCARD` with `WATCH`/`UNWATCH`
   optimistic locking.
+- **Blocking** — `BLPOP`/`BRPOP`/`BLMOVE`/`BRPOPLPUSH`/`BLMPOP`/`BZPOPMIN`/
+  `BZPOPMAX`/`BZMPOP` and `WAIT`. Clients park on their keys with optional
+  timeouts wired into the reactor; pushes wake the longest-waiting client
+  first (FIFO), and the commands run non-blocking inside `MULTI`/`EXEC`.
 - **Pub/Sub** — channel, pattern (`PSUBSCRIBE`) and sharded (`SSUBSCRIBE`)
   subscriptions, plus `PUBSUB` introspection.
 - **Persistence** — RDB-style point-in-time snapshots: `SAVE`, forked
@@ -112,8 +116,9 @@ RESP2/RESP3, the event loop, the five core types, keyspace + expiration,
 transactions, pub/sub, and RDB-style snapshots.
 
 **Milestone 2 — Complete the command surface**
-- [ ] Blocking commands: `BLPOP`/`BRPOP`/`BLMOVE`/`BLMPOP`/`BZPOPMIN`/`BZPOPMAX`,
-      `WAIT`, with client parking + timeouts wired into the reactor
+- [x] Blocking commands: `BLPOP`/`BRPOP`/`BLMOVE`/`BRPOPLPUSH`/`BLMPOP`/`BZMPOP`/
+      `BZPOPMIN`/`BZPOPMAX`, `WAIT`, with client parking + timeouts wired into
+      the reactor
 - [ ] Streams: `XADD`/`XREAD`(+`BLOCK`)/`XRANGE`, consumer groups
       (`XGROUP`/`XACK`/`XCLAIM`/`XAUTOCLAIM`), `XINFO`
 - [ ] HyperLogLog: `PFADD`/`PFCOUNT`/`PFMERGE` (dense + sparse encodings)
@@ -169,7 +174,9 @@ transactions, pub/sub, and RDB-style snapshots.
 
 ### Status today
 
-Milestone 1 is complete: ~165 commands, clean `srb tc`, and a green test suite.
+Milestone 1 is complete and Milestone 2 is underway: the blocking-command
+subsystem (client parking + timeouts in the reactor) has landed, bringing the
+total to ~176 commands, still with clean `srb tc` and a green test suite.
 Everything past it is deliberately staged — the command table, reply system, and
 reactor are structured so each milestone slots in without reworking the core.
 
