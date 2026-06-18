@@ -21,10 +21,12 @@ PONG
 - **Event loop** — a single-threaded `IO.select` reactor, faithful to Redis'
   own design. Command execution is serialized through one loop, which is what
   makes the atomicity guarantees hold without locking.
-- **Data types & ~176 commands**
+- **Data types & ~207 commands**
   - Strings: `GET`/`SET` (with `EX`/`PX`/`EXAT`/`PXAT`/`NX`/`XX`/`KEEPTTL`/`GET`),
-    `INCR`/`DECR`/`INCRBYFLOAT`, `APPEND`, `GETRANGE`/`SETRANGE`, `MGET`/`MSET`, …
-  - Bitmaps: `SETBIT`, `GETBIT`, `BITCOUNT`, `BITPOS`, `BITOP`.
+    `INCR`/`DECR`/`INCRBYFLOAT`, `APPEND`, `GETRANGE`/`SETRANGE`, `MGET`/`MSET`,
+    `LCS` (with `LEN`/`IDX`/`MINMATCHLEN`/`WITHMATCHLEN`), …
+  - Bitmaps: `SETBIT`, `GETBIT`, `BITCOUNT`, `BITPOS`, `BITOP`,
+    `BITFIELD`/`BITFIELD_RO`.
   - Lists: `LPUSH`/`RPUSH`, `LPOP`/`RPOP`, `LRANGE`, `LINSERT`, `LREM`, `LMOVE`,
     `LPOS`, `LMPOP`, …
   - Hashes: `HSET`, `HGETALL`, `HINCRBY`/`HINCRBYFLOAT`, `HRANDFIELD`, `HSCAN`, …
@@ -35,8 +37,18 @@ PONG
     `WEIGHTS`/`AGGREGATE`), `ZPOPMIN`/`ZPOPMAX`, `ZMPOP`, `ZSCAN`, …
   - Generic keyspace: `DEL`, `EXPIRE`/`TTL` family (with `NX`/`XX`/`GT`/`LT`),
     `TYPE`, `KEYS`, `SCAN`, `RENAME`, `COPY`, `MOVE`, `OBJECT ENCODING`, …
+  - Streams: `XADD` (with `*`/`ms-*`, `NOMKSTREAM`, `MAXLEN`/`MINID` trimming),
+    `XLEN`, `XRANGE`/`XREVRANGE`, `XREAD` (+`BLOCK`), `XDEL`, `XTRIM`, `XSETID`,
+    `XINFO`, and full consumer groups (`XGROUP`, `XREADGROUP`, `XACK`,
+    `XPENDING`, `XCLAIM`, `XAUTOCLAIM`).
+  - HyperLogLog: `PFADD`/`PFCOUNT`/`PFMERGE` (dense encoding, Ertl estimator).
+  - Geo: `GEOADD`/`GEOPOS`/`GEODIST`/`GEOHASH`/`GEOSEARCH`/`GEOSEARCHSTORE`
+    and the legacy `GEORADIUS`(`BYMEMBER`)(`_RO`) family, layered on the
+    sorted set with 52-bit interleaved geohash scores.
 - **Keyspace** — 16 logical databases (`SELECT`/`SWAPDB`/`MOVE`), lazy and
-  active key expiration.
+  active key expiration. `OBJECT ENCODING` reflects the real
+  intset/listpack/quicklist/hashtable/skiplist transitions against the
+  configured thresholds.
 - **Transactions** — `MULTI`/`EXEC`/`DISCARD` with `WATCH`/`UNWATCH`
   optimistic locking.
 - **Blocking** — `BLPOP`/`BRPOP`/`BLMOVE`/`BRPOPLPUSH`/`BLMPOP`/`BZPOPMIN`/
@@ -45,6 +57,9 @@ PONG
   first (FIFO), and the commands run non-blocking inside `MULTI`/`EXEC`.
 - **Pub/Sub** — channel, pattern (`PSUBSCRIBE`) and sharded (`SSUBSCRIBE`)
   subscriptions, plus `PUBSUB` introspection.
+- **Keyspace notifications** — `notify-keyspace-events` with the
+  `__keyspace@<db>__` / `__keyevent@<db>__` channels and per-class flag
+  filtering (`K`/`E`/`A`/`g$lshzxt`), including `expired` events.
 - **Persistence** — RDB-style point-in-time snapshots: `SAVE`, forked
   `BGSAVE`, automatic save points, snapshot load on startup, and
   `DEBUG RELOAD`.
@@ -62,8 +77,10 @@ lib/redis_ruby/
   database.rb        keyspace, expiration, WATCH bookkeeping
   pubsub.rb          publish/subscribe registry
   config.rb          CONFIG-backed settings
-  types/             List / Hash / Set / SortedSet value classes
+  types/             List / Hash / Set / SortedSet / Stream value classes
   commands/          one module per command family
+                     (strings, lists, hashes, sets, sorted_sets, bitmaps,
+                      streams, hyperloglog, geo, keys, blocking, …)
   persistence/rdb.rb RDB-style snapshot serializer
 ```
 
@@ -119,18 +136,26 @@ transactions, pub/sub, and RDB-style snapshots.
 - [x] Blocking commands: `BLPOP`/`BRPOP`/`BLMOVE`/`BRPOPLPUSH`/`BLMPOP`/`BZMPOP`/
       `BZPOPMIN`/`BZPOPMAX`, `WAIT`, with client parking + timeouts wired into
       the reactor
-- [ ] Streams: `XADD`/`XREAD`(+`BLOCK`)/`XRANGE`, consumer groups
-      (`XGROUP`/`XACK`/`XCLAIM`/`XAUTOCLAIM`), `XINFO`
-- [ ] HyperLogLog: `PFADD`/`PFCOUNT`/`PFMERGE` (dense + sparse encodings)
-- [ ] Geo: `GEOADD`/`GEOSEARCH`/`GEODIST`/`GEOPOS`/…
-- [ ] Bitfields: `BITFIELD`/`BITFIELD_RO`, plus `LCS`
-- [ ] True `OBJECT ENCODING` fidelity (intset/listpack/quicklist/ziplist
-      transitions) and a rehash-safe `SCAN` cursor
+- [x] Streams: `XADD`/`XREAD`(+`BLOCK`)/`XRANGE`/`XREVRANGE`/`XDEL`/`XTRIM`/
+      `XSETID`, consumer groups (`XGROUP`/`XREADGROUP`/`XACK`/`XPENDING`/
+      `XCLAIM`/`XAUTOCLAIM`), `XINFO`
+- [x] HyperLogLog: `PFADD`/`PFCOUNT`/`PFMERGE` (dense encoding + Ertl
+      estimator; the sparse encoding is not modeled)
+- [x] Geo: `GEOADD`/`GEOSEARCH`/`GEOSEARCHSTORE`/`GEODIST`/`GEOPOS`/`GEOHASH`
+      and the legacy `GEORADIUS`(`BYMEMBER`)(`_RO`) family
+- [x] Bitfields: `BITFIELD`/`BITFIELD_RO`, plus `LCS`
+- [x] True `OBJECT ENCODING` fidelity (intset/listpack/quicklist/hashtable/
+      skiplist transitions). *(Computed from contents on demand rather than
+      latched; a rehash-safe `SCAN` cursor is still pending.)*
 
 **Milestone 3 — Programmability**
 - [ ] Lua scripting: `EVAL`/`EVALSHA`/`SCRIPT`, a sandboxed `redis.call`
 - [ ] Functions: `FUNCTION LOAD`/`FCALL` libraries
-- [ ] Keyspace notifications (`notify-keyspace-events`)
+- [x] Keyspace notifications (`notify-keyspace-events`) — keyspace/keyevent
+      channels with class filtering, covering the common write commands and
+      `expired` events
+      *(per-key events for `RENAME`/`*MOVE` and the secondary empty-collection
+      `del` are not yet emitted)*
 - [ ] Client-side caching: `CLIENT TRACKING` + RESP3 invalidation pushes
 
 **Milestone 4 — Durability**
@@ -174,9 +199,17 @@ transactions, pub/sub, and RDB-style snapshots.
 
 ### Status today
 
-Milestone 1 is complete and Milestone 2 is underway: the blocking-command
-subsystem (client parking + timeouts in the reactor) has landed, bringing the
-total to ~176 commands, still with clean `srb tc` and a green test suite.
-Everything past it is deliberately staged — the command table, reply system, and
-reactor are structured so each milestone slots in without reworking the core.
+Milestones 1 and 2 are complete: alongside the core data plane and the
+blocking subsystem, the full Milestone 2 command surface has landed — streams
+(with consumer groups), HyperLogLog, geo, bitfields, `LCS`, and real
+`OBJECT ENCODING` fidelity — plus keyspace notifications from Milestone 3. That
+brings the total to ~207 commands, still with clean `srb tc` and a green test
+suite (driving real servers over TCP). Everything past it is deliberately
+staged — the command table, reply system, and reactor are structured so each
+milestone slots in without reworking the core.
+
+The larger remaining subsystems are scripting (`EVAL`/`FUNCTION`, which need a
+sandboxed Lua runtime), byte-compatible RDB and AOF, replication and Sentinel,
+Redis Cluster, ACLs, and TLS — each a substantial body of work tracked in the
+milestones above.
 
